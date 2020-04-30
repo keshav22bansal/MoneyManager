@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Homepage</title>
+    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+    <script src="https://unpkg.com/react@15/dist/react.js"></script>
+    <script src="https://unpkg.com/react-dom@15/dist/react-dom.min.js"></script>
+
+    <style>
+        body {
+            font-family: arial;
+            margin: 0;
+        }
+
+        nav {
+            background: #ff5353;
+            padding: 20px 10px;
+        }
+
+        nav ul {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 0;
+        }
+
+        nav li {
+            list-style-type: none;
+            display: inline-block;
+            margin: 0 10px 0 0;
+        }
+
+        nav a {
+            color: #fff;
+            font-size: 18px;
+            background: rgba(255, 255, 255, 0.2);
+            text-decoration: none;
+            padding: 10px;
+            display: block;
+        }
+
+        main,
+        header {
+            max-width: 960px;
+            margin: 30px auto;
+            padding: 0 10px;
+            color: #333;
+        }
+
+        main img {
+            width: 40px;
+            margin-right: 10px;
+            position: relative;
+            top: 12px;
+        }
+
+        main p {
+            display: inline-block;
+        }
+        .hide{
+            display:none;
+        }
+        .show{
+            display:block;
+        }
+    </style>
+</head>
+
+<body>
+    <nav>
+        <ul>
+            <% if (user) { %>
+            <li><a href="/auth/logout">Log out</a></li>
+            <% } else { %>
+            <li><a href="/auth/login">Login</a></li>
+            <% } %>
+            <li><a href="/">Homepage</a></li>
+            <li><a href="/profile">Profile</a></li>
+        </ul>
+    </nav>
+    <header>
+        <!-- <h1>Welcome to your profile, <%= user.displayName %></h1> -->
+    </header>
+    <main>
+        <img src="<%= user.thumbnail %>" />
+        <input type="hidden" value="<%= user.id %>" id="userid">
+        <input type="hidden" value="<%= user.username %>" id="username">
+        <input type="hidden" value="<%= user.displayName %>" id="displayName">
+
+        <!-- <p>This is your profile thumbnail</p> -->
+        <div id="head"></div>
+        <div id="add"></div>
+        <div id="transaction"></div>
+        <div id="passbook"></div>
+    </main>
+    <script src="http://code.jquery.com/jquery-latest.min.js"></script>
+    <script type="text/babel">
+
+        var Heading = React.createClass({
+            getInitialState:function(){
+                return {
+                    username:$("#username").val(),
+                    userid:$("#userid").val(),
+                    displayName:$("#displayName").val()
+                };
+            },
+            render:function(){
+                return (
+                    <h2>Welcome to your profile {this.state.displayName}</h2>
+                )
+            }
+        });
+        var FeedUser = React.createClass({
+            getInitialState:function(){
+                return {
+                    errors:""
+                }
+            },
+            submit:function(e){
+                e.preventDefault();
+                var obj = {
+                    username:this.refs.username.value,
+                    id:$("#userid").val().toString()
+                };
+                if(obj.username == ""){
+                    this.setState({errors:"Username must not be empty!"});
+                    return;
+                }
+                console.log(obj);
+                fetch('/api/username', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(obj)
+                }).then((result)=>{
+                    console.log(result);
+                    console.log(result.status);
+                    if(result.status==402){
+                        this.setState({errors:"Username is already taken"});
+                    }
+                    else{
+                        this.setState({errors:"Updated successfully"});
+                    }
+                });
+                
+                // console.log(this.refs.username.value);
+            },
+            render: function(){
+            return(
+            <div>
+                <span className="error"> {this.state.errors}</span>
+                <form onSubmit={this.submit}>
+                        <input ref="username" type="text" />
+                        <input type="submit" value="Add" />
+                </form>
+            </div>
+            );
+            } 
+            
+        });
+        var AddTransaction = React.createClass({
+            
+            getInitialState:function(){
+                return {
+                    errors:"",
+                    othPartyUsername:"",
+                    amount:0,
+                    sign:+1
+                };
+            },
+            render: function(){
+            return (
+                <form id="transaction" onSubmit={this.handleSubmit}>
+                <input type="text" ref="othParty" id="othParty" placeholder="username of other party" />
+                <input type="text" ref="amount" id="amount" placeholder="amount of transaction" />
+                <input type="radio" name="sign" ref="sign1"  checked/>Owes you<br/>
+                <input type="radio" name="sign" ref="sign2" /> You owe<br/>
+                <input type="submit" value="ADD TRANSACTION" />
+                </form>         
+            );
+            }
+        });
+        var Passbook = React.createClass({
+            getInitialState:function(){
+                    return {
+                    list:[],
+                    errors:"",
+                    othPartyUsername:"",
+                    amount:0,
+                    sign:+1,
+                    hide:true
+                };    
+            },
+            componentDidMount:function(){
+                var userid = $("#userid").val();
+                console.log('api/users/'+userid);
+                fetch('api/users/'+userid).then((data)=>(data.json())).then((data)=>{
+                    console.log('component',data.data);
+                    this.setState({list:data.data})
+                });
+            },
+            render:function(){
+                console.log(this.state);
+                var data2 = this.state.list;
+                console.log('data2',data2);
+                var obj = {};
+                var uniq = [];
+                for(var index = 0;index<data2.length;index++){
+                    var name = data2[index].username;
+                    console.log(name,data2[index]);
+                    if(!obj[name] && name.length!=0){
+                        obj[name]=0;
+                        uniq.push(name);
+                    }
+                    obj[name] += data2[index].amount;
+                    console.log("dpk",obj[name],data2[index].amount);
+                }
+                // console.log('total',obj);
+                var str = "";var arr = [];
+                for(var i = 0;i<uniq.length;i++){
+                    var name = uniq[i]; 
+                    var temp = data2.map((item,index)=>{
+                    if(item.username==uniq[i])
+                    {
+                        console.log(item);
+                        if(item.amount>0)
+                            return <li name="show" className={this.state.hide?"hide":"show"} key={index}>{item.username} borrowed {item.amount} ON {item.date.toString().substring(0,10)}</li>;
+                        else{
+                            return <li name="show" className={this.state.hide?"hide":"show"} key={index}>{item.username} payed {-item.amount} ON {item.date.toString().substring(0,10)}.</li>;
+                        }
+                    }
+                    else{
+                        return <span key={index}></span>;
+                    }
+                    });
+                    if(obj[name]>0)
+                        arr.push(<div><button onClick={this.handleClick} key={i}>{name} ows you {obj[name].toString()} </button><br />{temp}</div>);
+                    else
+                        arr.push(<div><button onClick={this.handleClick} key={i}>you owe {name} {(-obj[name]).toString()}</button><br />{temp}</div>);
+                }
+                
+                return <div><form id="transaction" onSubmit={this.handleSubmit}>
+                <input type="text" ref="othParty" id="othParty" placeholder="username of other party" />
+                <input type="text" ref="amount" id="amount" placeholder="amount of transaction" />
+                <input type="radio" name="sign" ref="sign1"  checked/>Owes you<br/>
+                <input type="radio" name="sign" ref="sign2" /> You owe<br/>
+                <input type="submit" value="ADD TRANSACTION" />
+                </form>         {arr}</div>;
+                
+            },
+            handleClick:function(){
+                this.setState({hide:!this.state.hide});
+
+            },
+            handleSubmit:function(e){
+                e.preventDefault();
+                this.setState({
+                    othPartyUsername:this.refs.othParty.value,
+                    amount:Number.parseInt(this.refs.amount.value),
+                    sign:this.refs.sign1.checked?1:-1
+                },function(){
+                var obj = this.state;
+                console.log('object',obj);
+                obj.payee = $("#userid").val();
+                fetch('/api/transaction', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(obj)
+                    }).then((result)=>{
+                        console.log(result);
+                        console.log(result.status);
+                        if(result.status==402){
+                            // this.errors("Fill all the fields")
+                            this.setState({errors:"Please fill all the fields"});
+                        }
+                        else{
+                var userid = $("#userid").val();
+
+                            this.setState({errors:"Updated successfully"},function(){
+                            fetch('api/users/'+userid).then((data)=>(data.json())).then((data)=>{
+                    console.log('component',data.data);
+                    this.setState({list:data.data})
+                            });
+                });
+                        }
+                });
+                });
+                
+            },
+        });
+        ReactDOM.render(<Passbook />, document.getElementById('passbook'));
+
+        ReactDOM.render(<Heading />, document.getElementById('head'));
+        ReactDOM.render(<FeedUser />, document.getElementById('add'));
+        // ReactDOM.render(<AddTransaction />, document.getElementById('transaction'));
+
+        </script>
+
+    <!-- <script src="profile.js"></script> -->
+</body>
+
+</html>
